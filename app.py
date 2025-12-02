@@ -16,7 +16,6 @@ df = pd.DataFrame()
 
 keep = [
     "Autre_appellation_de_l_edifice",
-    "Commune_forme_index",
     "Commune_forme_editoriale",
     "Denomination_de_l_edifice",
     "Siecle_de_la_campagne_principale_de_construction",
@@ -30,8 +29,6 @@ keep = [
 ]
 
 df = raw[keep].copy()
-
-st.write(raw)
 
 import re
 import unicodedata
@@ -116,19 +113,68 @@ def norm_denom(x):
 
     return x
 
+def norm_domain(x):
+    x = x.lower()
+
+    x = x.strip()
+    x = x.split()[-1]
+
+    # to_del = [
+    #     "architecture",
+    #     "aechitecture",
+    #     "architecte",
+    #     "architectecture",
+    #     "architectur",
+    #     "architectur",
+    #     "architectur", 
+    #     "archtecture",
+    #     "arhitecture",
+    #     "rchitecture",
+    #     "cture",
+    #     "de",
+    #     "d'",
+    #     "l'"
+    #     ]
+    # for i in to_del:
+    #     x = x.replace(i, "")
+
+    for i in ["doemstique"]:
+        x = x.replace(i, "domestique")
+
+    for i in ["judiciare"]:
+        x = x.replace(i, "judiciaire")
+
+    for i in ["miitaire", "militiare"]:
+        x = x.replace(i, "militaire")
+    
+    for i in ["religiese", "religeuse", "remigieuse"]:
+        x = x.replace(i, "religieuse")
+
+    if ";" in x:
+        x = x.split(";", 1)[0]
+    if "," in x:
+        x = x.split(",", 1)[0]
+    x = x.strip()
+    return x
+
 df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].astype(str)
 df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(norm_siecle)
 
 df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].astype(str)
 df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(norm_denom)
 
+df["Domaine"] = df["Domaine"].astype(str)
+df["Domaine"] = df["Domaine"].apply(norm_domain)
+
 st.write(df["Siecle_de_la_campagne_principale_de_construction"].unique())
 
 plot = alt.Chart(df).mark_circle().encode(
-    y='Denomination_de_l_edifice:N',
+    y='Domaine:N',
     x='Siecle_de_la_campagne_principale_de_construction:N',
     size='count():Q',
     color=alt.Color("count():Q").scale(scheme="blueorange").legend(None)
 )
+
+st.write(df)
 
 st.altair_chart(plot)
