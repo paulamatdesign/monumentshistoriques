@@ -10,77 +10,117 @@ st.title("Répartition des Monuments Historiques")
 
 st.caption("Réusage des [données OpenData](https://www.data.gouv.fr/datasets/immeubles-proteges-au-titre-des-monuments-historiques-2/reuses_and_dataservices)")
 
-df = pd.read_csv("data/merimee.csv", sep="|")
+raw = pd.read_csv("data/merimee.csv", sep="|")
 
-st.write(df)
+df = pd.DataFrame()
 
-def normalize_text(text):
+keep = [
+    "Autre_appellation_de_l_edifice",
+    "Commune_forme_index",
+    "Commune_forme_editoriale",
+    "Denomination_de_l_edifice",
+    "Siecle_de_la_campagne_principale_de_construction",
+    "Description_de_l_edifice",
+    "Domaine",
+    "Departement_format_numerique",
+    "Departement_en_lettres",
+    "Historique",
+    "Liens_externes",
+    "Region"
+]
 
-    text = text.replace("-", " ")
-    text = text.replace(",", " ")
-    text = re.sub(r"\(.*?\)", "", text)
-    
-    text_no_accents = ''.join(
-        c for c in unicodedata.normalize('NFD', text)
+df = raw[keep].copy()
+
+st.write(raw)
+
+import re
+import unicodedata
+
+def norm_siecle(x: str) -> str:
+    if not isinstance(x, str):
+        x = str(x)
+
+    # 1) Remove commas, hyphens, parentheses content
+    x = x.replace("-", " ")
+    x = x.replace(",", " ")
+    x = re.sub(r"\(.*?\)", "", x)
+
+    # 2) Remove accents
+    x = ''.join(
+        c for c in unicodedata.normalize('NFD', x)
         if unicodedata.category(c) != 'Mn'
     )
 
-    return text_no_accents.lower().strip().capitalize()
-    
-def no_comma(text):
-    if ";" in text:
-        return text.split(";", 1)[0]
-    else:
-        return text
-    
-def extraire_prec_siecle(text):
+    # 3) Normalize case and strip
+    x = x.lower().strip()
+
+    # 4) Cut at first ";" if present
+    if ";" in x:
+        x = x.split(";", 1)[0].strip()
+
+    # 5) If "siecle" is present, keep the 4 chars before last occurrence
     mot = "siecle"
-    if mot in text:
-        idx = text.rfind(mot)  # dernière occurrence
-
-        if idx == -1:
-            return None  # "siècle" absent
-
-        # indice de début des 4 caractères précédents
+    if mot in x:
+        idx = x.rfind(mot)
+        # idx can't be -1 here, mot in x already checked
         start = max(0, idx - 4)
-        return text[start:idx]
-    else:
-        return text
-    
-def first_word(texte):
-    return texte.strip().split()[0] if texte.strip() else ""
-    
-def regroup(text):
-    terms = [
-        "Neolithique",
-        "Paleolithique",
-        "Gallo-romain",
-        "Moyen Age",
-        "Age du bronze",
-        "Age du fer"
-    ]
-    
-    for term in terms:
-        if term in text:
-            return term
-        elif term.lower() in text:
-            return term
-        
-    text = text.replace("3 000 av. j. c. a 900 apr. j. c.", "Age du bronze")
-    text = text.replace("Moyen Age", "Moyen age")
+        x = x[start:idx].strip()
 
-    return text  # only happens if none matched
+    # 6) Map to known periods if possible
+    terms = [
+        "neolithique",
+        "paleolithique",
+        "gallo romain",
+        "moyen age",
+        "age du bronze",
+        "age du fer",
+    ]
+
+    for term in terms:
+        if term in x:
+            x = term
+            break
+
+    # 7) Specific replacements (now everything is lowercase, no accents)
+    x = x.replace("3 000 av. j. c. a 900 apr. j. c.", "age du bronze")
+    x = x.replace("moyen age", "moyen age")  # already that, but you can adjust if needed
+
+    # 8) Final formatting: capitalize first letter
+    x = x.strip().capitalize()
+
+    return x
+
+def norm_denom(x):
+    # 1) If ";" present, keep only before first ";"
+    if ";" in x:
+        x = x.split(";", 1)[0]
+
+    # 2) Keep only the first word
+    x = x.strip().split()[0] if x.strip() else ""
+
+    # 3) Replace "-" and "," with spaces
+    x = x.replace("-", " ")
+    x = x.replace(",", " ")
+
+    # 4) Remove parentheses and their content
+    x = re.sub(r"\(.*?\)", "", x)
+
+    # 5) Remove accents
+    x = ''.join(
+        c for c in unicodedata.normalize('NFD', x)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+    # 6) Normalize case: lower then capitalize first letter
+    x = x.lower().strip().capitalize()
+
+    return x
 
 df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].astype(str)
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(normalize_text)
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(no_comma)
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(extraire_prec_siecle)
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(regroup)
+df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(norm_siecle)
 
 df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].astype(str)
-df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(no_comma)
-df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(first_word)
-df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(normalize_text)
+df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(norm_denom)
 
 st.write(df["Siecle_de_la_campagne_principale_de_construction"].unique())
 
