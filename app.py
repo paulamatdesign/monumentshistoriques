@@ -14,21 +14,22 @@ raw = pd.read_csv("data/merimee.csv", sep="|")
 
 df = pd.DataFrame()
 
-keep = [
-    "Autre_appellation_de_l_edifice",
-    "Commune_forme_editoriale",
-    "Denomination_de_l_edifice",
-    "Siecle_de_la_campagne_principale_de_construction",
-    "Description_de_l_edifice",
-    "Domaine",
-    "Departement_format_numerique",
-    "Departement_en_lettres",
-    "Historique",
-    "Liens_externes",
-    "Region"
-]
+keep = {
+    "Autre_appellation_de_l_edifice": "appellation",
+    "Commune_forme_editoriale": "commune",
+    "Denomination_de_l_edifice": "denomination",
+    "Siecle_de_la_campagne_principale_de_construction": "siecle",
+    "Description_de_l_edifice": "description",
+    "Domaine": "domaine",
+    "Departement_format_numerique": "departement_int",
+    "Departement_en_lettres": "departement_str",
+    "Historique": "historique",
+    "Liens_externes": "lien",
+    "Region": "region"
+}
 
-df = raw[keep].copy()
+for i, j in keep.items():
+    df[j] = raw[i]
 
 import re
 import unicodedata
@@ -157,24 +158,20 @@ def norm_domain(x):
     x = x.strip()
     return x
 
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].astype(str)
-df["Siecle_de_la_campagne_principale_de_construction"] = df["Siecle_de_la_campagne_principale_de_construction"].apply(norm_siecle)
+df["siecle"] = df["siecle"].astype(str)
+df["siecle"] = df["siecle"].apply(norm_siecle)
 
-df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].astype(str)
-df["Denomination_de_l_edifice"] = df["Denomination_de_l_edifice"].apply(norm_denom)
+df["denomination"] = df["denomination"].astype(str)
+df["denomination"] = df["denomination"].apply(norm_denom)
 
-df["Domaine"] = df["Domaine"].astype(str)
-df["Domaine"] = df["Domaine"].apply(norm_domain)
-
-st.write(df["Siecle_de_la_campagne_principale_de_construction"].unique())
+df["domaine"] = df["domaine"].astype(str)
+df["domaine"] = df["domaine"].apply(norm_domain)
 
 plot = alt.Chart(df).mark_circle().encode(
-    y='Domaine:N',
-    x='Siecle_de_la_campagne_principale_de_construction:N',
-    size='count():Q',
-    color=alt.Color("count():Q").scale(scheme="blueorange").legend(None)
+    y='domaine:N',
+    x='region:N',
+    size=alt.Size('count():Q', scale=alt.Scale(type='log')),
+    color=alt.Color('count():Q', scale=alt.Scale(type='log', scheme="blues", reverse=True)).legend(None),
 )
-
-st.write(df)
 
 st.altair_chart(plot)
